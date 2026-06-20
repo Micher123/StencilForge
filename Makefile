@@ -18,7 +18,7 @@ build-frontend:
 # Сборка бэкенда
 build-backend:
 	@echo "=== Сборка бэкенда ==="
-	cd backend && go build -o stencilforge-server .
+	cd backend && CGO_ENABLED=1 go build -o stencilforge-server .
 	@echo "=== Бэкенд собран ==="
 
 # Очистка артефактов сборки
@@ -60,7 +60,7 @@ stop:
 
 # Запуск бэкенда в режиме разработки (go run)
 dev-backend:
-	cd backend && go run .
+	cd backend && CGO_ENABLED=1 go run .
 
 # Запуск фронтенда в режиме разработки (webpack dev-server с hot-reload)
 dev-frontend:
@@ -72,7 +72,7 @@ dev:
 	@echo "Бэкенд: http://localhost:8080"
 	@echo "Фронтенд (dev): http://localhost:3000"
 	@trap 'kill 0' EXIT; \
-	(cd backend && go run .) & \
+	(cd backend && CGO_ENABLED=1 go run .) & \
 	(cd frontend && npm start) & \
 	wait
 

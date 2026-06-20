@@ -473,6 +473,12 @@ a:hover {
   color: var(--text-secondary);
 }
 
+.download-all-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
 /* Zoom overlay */
 .zoom-overlay {
   position: fixed;
@@ -506,6 +512,42 @@ a:hover {
   align-items: center;
   box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
   animation: scaleIn 0.25s ease;
+}
+
+.zoom-content-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+.zoom-nav {
+  background: none;
+  border: none;
+  font-size: 42px;
+  font-weight: 200;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 12px;
+  line-height: 1;
+  transition: color 0.15s, background 0.15s;
+  border-radius: 8px;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.zoom-nav:hover {
+  color: var(--accent);
+  background: rgba(108, 92, 231, 0.08);
+}
+
+.zoom-nav-left {
+  /* left arrow */
+}
+
+.zoom-nav-right {
+  /* right arrow */
 }
 
 @keyframes scaleIn {

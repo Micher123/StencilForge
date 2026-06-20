@@ -18,6 +18,14 @@ function LayersPanel({ layers, loading }: Props) {
     window.open(layer.download_url, '_blank');
   };
 
+  const handleDownloadAll = () => {
+    layers.forEach((layer, i) => {
+      setTimeout(() => {
+        window.open(layer.download_url, '_blank');
+      }, i * 300);
+    });
+  };
+
   const handleZoom = useCallback((layer: LayerInfo) => {
     setZoomedLayer(layer);
   }, []);
@@ -68,25 +76,60 @@ function LayersPanel({ layers, loading }: Props) {
               title="Нажмите для увеличения"
             />
             <div className="layer-label">Слой {layer.index + 1}</div>
-            <button
-              className="download-btn"
-              onClick={() => handleDownloadLayer(layer)}
-            >
-              Скачать
-            </button>
           </div>
         ))}
+      </div>
+
+      <div className="download-all-row">
+        <button className="btn btn-primary" onClick={handleDownloadAll}>
+          Скачать трафареты
+        </button>
       </div>
 
       {/* Модальное окно увеличения */}
       {zoomedLayer && (
         <div className="zoom-overlay" onClick={handleCloseZoom}>
           <div className="zoom-container" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={zoomedLayer.data_url}
-              alt={`Слой ${zoomedLayer.index + 1}`}
-              className="zoom-image"
-            />
+            <div className="zoom-content-row">
+              {(() => {
+                const idx = layers.findIndex((l) => l.index === zoomedLayer.index);
+                const hasPrev = idx > 0;
+                const hasNext = idx < layers.length - 1;
+                return (
+                  <>
+                    {hasPrev && (
+                      <button
+                        className="zoom-nav zoom-nav-left"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setZoomedLayer(layers[idx - 1]);
+                        }}
+                        title="Предыдущий слой"
+                      >
+                        ‹
+                      </button>
+                    )}
+                    <img
+                      src={zoomedLayer.data_url}
+                      alt={`Слой ${zoomedLayer.index + 1}`}
+                      className="zoom-image"
+                    />
+                    {hasNext && (
+                      <button
+                        className="zoom-nav zoom-nav-right"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setZoomedLayer(layers[idx + 1]);
+                        }}
+                        title="Следующий слой"
+                      >
+                        ›
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
             <div className="zoom-actions">
               <button
                 className="btn btn-primary"

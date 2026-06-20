@@ -1,0 +1,20 @@
+# Бинарники бэкенда
+backend/stencilforge-server
+
+# Артефакты сборки фронтенда
+frontend/public/dist/
+frontend/node_modules/
+
+# Логи и PID
+server.log
+.server.pid
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Системные файлы
+.DS_Store
+Thumbs.db

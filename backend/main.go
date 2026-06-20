@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"stencilforge/auth"
 	"stencilforge/db"
@@ -13,6 +14,9 @@ import (
 )
 
 func main() {
+	// Загрузка .env (если есть)
+	loadEnv()
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -21,7 +25,6 @@ func main() {
 	// Инициализация БД
 	dataDir := os.Getenv("STENCILFORGE_DATA_DIR")
 	if dataDir == "" {
-		// по умолчанию в домашней директории пользователя
 		home, err := os.UserHomeDir()
 		if err != nil {
 			home = "."
@@ -41,13 +44,22 @@ func main() {
 	mux.HandleFunc("/api/logout", handlers.CORS(handlers.LogoutHandler))
 	mux.HandleFunc("/api/me", handlers.CORS(auth.AuthMiddleware(handlers.MeHandler)))
 
+	// Plans — публичный
+	mux.HandleFunc("/api/plans", handlers.CORS(handlers.PlansHandler))
+
+	// Payment endpoints (защищённые)
+	mux.HandleFunc("/api/create-payment", handlers.CORS(auth.AuthMiddleware(handlers.CreatePaymentHandler)))
+	mux.HandleFunc("/api/check-payment", handlers.CORS(auth.AuthMiddleware(handlers.CheckPaymentHandler)))
+
+	// Webhook — публичный (от ЮKassa)
+	mux.HandleFunc("/api/payment-webhook", handlers.CORS(handlers.PaymentWebhookHandler))
+
 	// Stencil endpoints (защищённые)
 	mux.HandleFunc("/api/upload", handlers.CORS(auth.AuthMiddleware(handlers.UploadHandler)))
 	mux.HandleFunc("/api/layers", handlers.CORS(auth.AuthMiddleware(handlers.LayersHandler)))
 	mux.HandleFunc("/api/download-all", handlers.CORS(auth.AuthMiddleware(handlers.DownloadAllHandler)))
 
 	// Serve built frontend (production) or fallback to public for dev
-	// Try several possible locations for dist directory
 	distDirs := []string{
 		"frontend/public/dist",
 		"../frontend/public/dist",
@@ -61,7 +73,6 @@ func main() {
 	}
 	if distDir != "" {
 		fs := http.FileServer(http.Dir(distDir))
-		// Не-static файлы отдаём index.html (SPA routing)
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			path := filepath.Join(distDir, r.URL.Path)
 			if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -77,4 +88,42 @@ func main() {
 
 	fmt.Printf("StencilForge server listening on :%s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, mux))
+}
+
+// loadEnv загружает переменные из .env файла (простой парсер)
+func loadEnv() {
+	// Ищем .env в текущей директории и родительской
+	paths := []string{".env", "../.env", "../../.env"}
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		parseEnvFile(string(data))
+		fmt.Printf("Loaded env from %s\n", p)
+		break
+	}
+}
+
+func parseEnvFile(content string) {
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		// Убираем export prefix если есть
+		line = strings.TrimPrefix(line, "export ")
+		idx := strings.Index(line, "=")
+		if idx < 0 {
+			continue
+		}
+		key := strings.TrimSpace(line[:idx])
+		val := strings.TrimSpace(line[idx+1:])
+		// Убираем кавычки
+		val = strings.Trim(val, `"'`)
+		if os.Getenv(key) == "" { // не перезаписываем уже установленные
+			os.Setenv(key, val)
+		}
+	}
 }

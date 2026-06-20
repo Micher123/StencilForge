@@ -1,4 +1,5 @@
 import { useState, useCallback, FormEvent } from 'react';
+import { extractErrorMessage } from '../utils/errors';
 
 interface UserInfo {
   id: number;
@@ -101,9 +102,13 @@ function AuthPage({ onAuth, token: existingToken }: AuthPageProps) {
         body: JSON.stringify(body),
       });
 
-      const data = await res.json();
+      if (!res.ok) {
+        const msg = await extractErrorMessage(res);
+        throw new Error(msg);
+      }
 
-      if (!res.ok || !data.ok) {
+      const data = await res.json();
+      if (!data.ok) {
         throw new Error(data.error || 'Ошибка сервера');
       }
 
@@ -111,15 +116,18 @@ function AuthPage({ onAuth, token: existingToken }: AuthPageProps) {
         localStorage.setItem('stencilforge-token', data.token);
         onAuth(data.token, data.user);
       } else if (data.token) {
-        // login может не возвращать user (хотя у нас возвращает)
         localStorage.setItem('stencilforge-token', data.token);
-        // пробуем получить user через /api/me
         const meRes = await fetch('/api/me', {
           headers: { 'Authorization': `Bearer ${data.token}` },
         });
+        if (!meRes.ok) {
+          throw new Error('Не удалось загрузить профиль. Попробуйте войти снова.');
+        }
         const meData = await meRes.json();
         if (meData.ok && meData.user) {
           onAuth(data.token, meData.user);
+        } else {
+          throw new Error('Не удалось загрузить профиль. Попробуйте войти снова.');
         }
       }
     } catch (e: unknown) {

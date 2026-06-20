@@ -50,7 +50,7 @@ type MeResponse struct {
 // RegisterHandler обрабатывает POST /api/register
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		http.Error(w, `{"error":"Метод не поддерживается"}`, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -136,7 +136,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 // LoginHandler обрабатывает POST /api/login
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		http.Error(w, `{"error":"Метод не поддерживается"}`, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -205,7 +205,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 // MeHandler обрабатывает GET /api/me (информация о текущем пользователе)
 func MeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		http.Error(w, `{"error":"Метод не поддерживается"}`, http.StatusMethodNotAllowed)
 		return
 	}
 

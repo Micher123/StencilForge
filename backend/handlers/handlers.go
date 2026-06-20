@@ -13,9 +13,11 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
+	"stencilforge/db"
 	"stencilforge/processor"
 
 	"golang.org/x/image/bmp"
@@ -65,32 +67,32 @@ func CORS(next http.HandlerFunc) http.HandlerFunc {
 
 func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Метод не поддерживается"})
 		return
 	}
 
 	err := r.ParseMultipartForm(50 << 20)
 	if err != nil {
-		http.Error(w, "failed to parse form: "+err.Error(), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Не удалось обработать загружаемый файл. Попробуйте снова."})
 		return
 	}
 
 	file, header, err := r.FormFile("image")
 	if err != nil {
-		http.Error(w, "failed to get image: "+err.Error(), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Файл изображения не найден в запросе. Выберите изображение для загрузки."})
 		return
 	}
 	defer file.Close()
 
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".bmp" && ext != ".tiff" && ext != ".tif" {
-		http.Error(w, "unsupported image format: "+ext, http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": fmt.Sprintf("Неподдерживаемый формат: %s. Поддерживаются PNG, JPG, BMP, TIFF.", ext)})
 		return
 	}
 
 	img, err := decodeImage(file, ext)
 	if err != nil {
-		http.Error(w, "failed to decode image: "+err.Error(), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Не удалось прочитать изображение. Возможно, файл повреждён."})
 		return
 	}
 
@@ -111,21 +113,33 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 
 func LayersHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Метод не поддерживается"})
 		return
 	}
 
 	var req LayersRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request: "+err.Error(), http.StatusBadRequest)
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Неверный формат запроса. Пожалуйста, обновите страницу и попробуйте снова."})
 		return
+	}
+
+	// Проверка тарифного лимита пользователя
+	userIDStr := r.Header.Get("X-User-ID")
+	if userIDStr != "" {
+		if uid, err := strconv.Atoi(userIDStr); err == nil {
+			user, _ := db.GetUserByID(int64(uid))
+			if user != nil && req.NumLayers > user.MaxLayers {
+				writeJSON(w, http.StatusForbidden, map[string]string{"error": fmt.Sprintf("Ваш тариф позволяет не более %d слоёв. Уменьшите количество или смените тариф.", user.MaxLayers)})
+				return
+			}
+		}
 	}
 
 	mu.Lock()
 	src, ok := imageStore[req.SessionID]
 	mu.Unlock()
 	if !ok {
-		http.Error(w, "session not found", http.StatusNotFound)
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "Сессия не найдена. Пожалуйста, загрузите изображение заново."})
 		return
 	}
 
@@ -261,7 +275,7 @@ func LayersHandler(w http.ResponseWriter, r *http.Request) {
 
 func DownloadAllHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "Метод не поддерживается"})
 		return
 	}
 
@@ -275,7 +289,7 @@ func DownloadAllHandler(w http.ResponseWriter, r *http.Request) {
 		key := fmt.Sprintf("%s_layer_%s", sessionID, layerIdx)
 		img, ok := imageStore[key]
 		if !ok {
-			http.Error(w, "layer not found", http.StatusNotFound)
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "Слой не найден. Пожалуйста, сгенерируйте слои заново."})
 			return
 		}
 		w.Header().Set("Content-Type", "image/png")

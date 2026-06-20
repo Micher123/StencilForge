@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import { extractErrorMessage } from '../utils/errors';
 
 interface Props {
   onUploaded: (sessionId: string, dataUrl: string) => void;
@@ -9,6 +10,7 @@ interface Props {
 function UploadZone({ onUploaded, onError, token }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback(
@@ -50,11 +52,12 @@ function UploadZone({ onUploaded, onError, token }: Props) {
         });
 
         if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || `Ошибка загрузки: ${res.status}`);
+          const msg = await extractErrorMessage(res);
+          throw new Error(msg);
         }
 
         const data = await res.json();
+        setPreviewUrl(dataUrl);
         onUploaded(data.session_id, dataUrl);
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : 'Неизвестная ошибка при загрузке';
@@ -108,9 +111,27 @@ function UploadZone({ onUploaded, onError, token }: Props) {
         accept="image/png,image/jpeg,image/bmp,image/tiff"
         onChange={handleChange}
       />
-      <div className="icon">{uploading ? '⏳' : '📁'}</div>
-      <p>{uploading ? 'Загрузка...' : 'Перетащите изображение сюда или кликните для выбора'}</p>
-      <p className="hint">PNG, JPG, BMP, TIFF — до 50MB</p>
+      {previewUrl ? (
+        <div className="upload-preview">
+          <img src={previewUrl} alt="Загруженное изображение" className="uploaded-image" />
+          <button
+            className="btn btn-sm btn-outline upload-change-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPreviewUrl('');
+              fileInputRef.current?.click();
+            }}
+          >
+            Загрузить другое изображение
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="icon">{uploading ? '⏳' : '📁'}</div>
+          <p>{uploading ? 'Загрузка...' : 'Перетащите изображение сюда или кликните для выбора'}</p>
+          <p className="hint">PNG, JPG, BMP, TIFF — до 50MB</p>
+        </>
+      )}
     </div>
   );
 }

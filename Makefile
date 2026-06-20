@@ -34,6 +34,7 @@ clean:
 # Запуск production-сервера (предварительно собрать через make build)
 deploy:
 	@echo "=== Запуск StencilForge ==="
+	@fuser -k 8080/tcp 2>/dev/null || true
 	cd backend && ./stencilforge-server
 
 # Запуск в фоне с PID-файлом

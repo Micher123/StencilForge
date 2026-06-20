@@ -139,12 +139,16 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			}
 		}
 		if tokenStr == "" {
-			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"error":"Требуется авторизация. Пожалуйста, войдите в аккаунт."}`))
 			return
 		}
 		claims, err := ValidateToken(tokenStr)
 		if err != nil {
-			http.Error(w, `{"error":"invalid token"}`, http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(`{"error":"Сессия истекла или недействительна. Пожалуйста, войдите снова."}`))
 			return
 		}
 		// Кладём user_id и email в заголовки для handler'ов

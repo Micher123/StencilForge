@@ -3,9 +3,10 @@ import { useState, useRef, useCallback } from 'react';
 interface Props {
   onUploaded: (sessionId: string, dataUrl: string) => void;
   onError: (msg: string) => void;
+  token: string;
 }
 
-function UploadZone({ onUploaded, onError }: Props) {
+function UploadZone({ onUploaded, onError, token }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,6 +43,9 @@ function UploadZone({ onUploaded, onError }: Props) {
 
         const res = await fetch('/api/upload', {
           method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
           body: formData,
         });
 

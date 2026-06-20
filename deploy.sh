@@ -72,7 +72,7 @@ build_frontend() {
 build_backend() {
     log_step "Сборка бэкенда..."
     cd "$SCRIPT_DIR/backend"
-    go build -o stencilforge-server .
+    CGO_ENABLED=1 go build -o stencilforge-server .
     log_info "Бэкенд собран."
     cd "$SCRIPT_DIR"
 }
@@ -227,7 +227,7 @@ cmd_dev() {
     log_info "Бэкенд: http://localhost:$PORT"
     log_info "Фронтенд (dev): http://localhost:3000"
     trap 'kill 0' EXIT
-    (cd "$SCRIPT_DIR/backend" && PORT="$PORT" go run .) &
+    (cd "$SCRIPT_DIR/backend" && PORT="$PORT" CGO_ENABLED=1 go run .) &
     (cd "$SCRIPT_DIR/frontend" && npm start) &
     wait
 }

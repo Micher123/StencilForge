@@ -2,11 +2,20 @@ import { useState, useCallback, useEffect } from 'react';
 import UploadZone from './components/UploadZone';
 import LayersPanel from './components/LayersPanel';
 import ThemeToggle from './components/ThemeToggle';
+import AuthPage from './components/AuthPage';
 
 interface LayerInfo {
   index: number;
   download_url: string;
   data_url: string;
+}
+
+interface UserInfo {
+  id: number;
+  username: string;
+  email: string;
+  plan: string;
+  newsletter_opt_in: boolean;
 }
 
 type AppPhase = 'upload' | 'layers';
@@ -15,6 +24,11 @@ function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     return (localStorage.getItem('stencilforge-theme') as 'light' | 'dark') || 'light';
   });
+  const [token, setToken] = useState<string>(() => {
+    return localStorage.getItem('stencilforge-token') || '';
+  });
+  const [user, setUser] = useState<UserInfo | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [phase, setPhase] = useState<AppPhase>('upload');
   const [sessionId, setSessionId] = useState<string>('');
   const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -27,6 +41,48 @@ function App() {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('stencilforge-theme', theme);
   }, [theme]);
+
+  // Проверка токена при загрузке
+  useEffect(() => {
+    if (!token) {
+      setAuthChecked(true);
+      return;
+    }
+    fetch('/api/me', {
+      headers: { 'Authorization': `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok && data.user) {
+          setUser(data.user);
+        } else {
+          localStorage.removeItem('stencilforge-token');
+          setToken('');
+        }
+        setAuthChecked(true);
+      })
+      .catch(() => {
+        setAuthChecked(true);
+      });
+  }, [token]);
+
+  const handleAuth = useCallback((newToken: string, userInfo: UserInfo) => {
+    setToken(newToken);
+    setUser(userInfo);
+    localStorage.setItem('stencilforge-token', newToken);
+  }, []);
+
+  const handleLogout = useCallback(() => {
+    fetch('/api/logout', { method: 'POST' }).catch(() => { });
+    localStorage.removeItem('stencilforge-token');
+    setToken('');
+    setUser(null);
+    setPhase('upload');
+    setSessionId('');
+    setPreviewUrl('');
+    setLayers([]);
+    setError('');
+  }, []);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
@@ -49,7 +105,10 @@ function App() {
     try {
       const res = await fetch('/api/layers', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           session_id: sessionId,
           num_layers: numLayers,
@@ -74,7 +133,38 @@ function App() {
     } finally {
       setLoading(false);
     }
-  }, [sessionId, numLayers]);
+  }, [sessionId, numLayers, token]);
+
+  const handleDownloadAll = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      const res = await fetch('/api/download-all', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || `Ошибка скачивания: ${res.status}`);
+      }
+      // Скачиваем zip-файл
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'stencilforge-layers.zip';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Неизвестная ошибка при скачивании';
+      setError(msg);
+    }
+  }, [sessionId, token]);
 
   const handleReset = useCallback(() => {
     setPhase('upload');
@@ -84,11 +174,51 @@ function App() {
     setError('');
   }, []);
 
+  if (!authChecked) {
+    return (
+      <div className="app-container">
+        <header className="app-header">
+          <h1>StencilForge</h1>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        </header>
+        <main className="main-content">
+          <div className="card">
+            <p>Загрузка...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Не авторизован — показываем страницу входа/регистрации
+  if (!token || !user) {
+    return (
+      <div className="app-container">
+        <header className="app-header">
+          <h1>StencilForge</h1>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        </header>
+        <main className="main-content">
+          <AuthPage onAuth={handleAuth} />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="app-container">
       <header className="app-header">
         <h1>StencilForge</h1>
-        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        <div className="header-right">
+          <div className="user-info">
+            <span className="user-name">{user.username}</span>
+            <span className="user-plan">{user.plan}</span>
+          </div>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          <button className="btn btn-logout" onClick={handleLogout} title="Выйти">
+            Выйти
+          </button>
+        </div>
       </header>
 
       <main className="main-content">
@@ -99,7 +229,7 @@ function App() {
         {phase === 'upload' && (
           <div className="card">
             <h2 className="card-title">Загрузка изображения</h2>
-            <UploadZone onUploaded={handleUploaded} onError={setError} />
+            <UploadZone onUploaded={handleUploaded} onError={setError} token={token} />
           </div>
         )}
 
@@ -140,6 +270,14 @@ function App() {
             </div>
 
             <LayersPanel layers={layers} loading={loading} />
+            {layers.length > 0 && (
+              <div className="card">
+                <h2 className="card-title">Скачать всё</h2>
+                <button className="btn btn-primary" onClick={handleDownloadAll}>
+                  Скачать все слои (ZIP)
+                </button>
+              </div>
+            )}
           </>
         )}
       </main>

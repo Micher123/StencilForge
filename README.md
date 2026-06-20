@@ -4,27 +4,28 @@
 
 Загрузите изображение, укажите количество слоёв — и получите набор чёрно-белых масок, готовых для печати, вырезания и послойного нанесения краски.
 
-## Возможности
-
 - Загрузка изображений в форматах PNG, JPEG, BMP, TIFF
 - Автоматическая / ручная установка количества слоёв (2–16)
 - Качественная кластеризация: k-means++ в цветовом пространстве CIELAB, 50 итераций
 - Постобработка масок: медианный фильтр, морфологическое закрытие, фильтрация мелких компонент
 - Сортировка слоёв от тёмного к светлому для правильного послойного наложения
 - Увеличение слоя по клику на миниатюру (модальное окно)
-- Скачивание как отдельных слоёв (PNG), так и всех разом
+- Скачивание как отдельных слоёв (PNG), так и всех разом (ZIP)
+- **Аутентификация пользователей**: регистрация, вход, JWT-токены, bcrypt-хэширование паролей
 - Светлая / тёмная тема веб-интерфейса
 
 ## Требования
 
-- **Go** ≥ 1.21
+- **Go** ≥ 1.21 (с поддержкой CGO для SQLite)
 - **Node.js** ≥ 18, **npm** ≥ 9
+- **GCC** (для компиляции SQLite через CGO)
 
 Проверка:
 ```bash
 go version
 node --version
 npm --version
+gcc --version
 ```
 
 ## Быстрый старт
@@ -91,8 +92,12 @@ StencilForge/
 ├── backend/
 │   ├── main.go                 # Точка входа, HTTP-сервер
 │   ├── go.mod / go.sum
-│   ├── handlers/handlers.go    # Обработчики API (upload, layers, download)
-│   └── processor/processor.go  # Обработка изображений, k-means, маски
+│   ├── handlers/
+│   │   ├── handlers.go         # Обработчики API изображений (upload, layers, download)
+│   │   └── auth_handlers.go    # Обработчики аутентификации (register, login, logout, me)
+│   ├── processor/processor.go  # Обработка изображений, k-means, маски
+│   ├── auth/auth.go            # JWT-токены, bcrypt-хэширование, middleware
+│   └── db/db.go                # SQLite БД, модель пользователей
 ├── frontend/
 │   ├── package.json
 │   ├── tsconfig.json
@@ -102,6 +107,7 @@ StencilForge/
 │       ├── index.tsx
 │       ├── App.tsx
 │       ├── components/
+│       │   ├── AuthPage.tsx     # Страница регистрации / входа
 │       │   ├── LayersPanel.tsx  # Отображение и zoom слоёв
 │       │   ├── ThemeToggle.tsx  # Переключение темы
 │       │   └── UploadZone.tsx   # Загрузка изображения
@@ -114,8 +120,71 @@ StencilForge/
 
 ## API
 
-### `POST /api/upload`
-Загрузка изображения.
+Все эндпоинты (кроме регистрации и входа) требуют заголовок:
+```
+Authorization: Bearer <JWT-токен>
+```
+
+### Аутентификация
+
+#### `POST /api/register`
+Регистрация нового пользователя.
+
+**Request:**
+```json
+{
+  "username": "user",
+  "email": "user@example.com",
+  "password": "secure_password",
+  "newsletter_opt_in": false
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true,
+  "token": "eyJhbGciOiJI...",
+  "user": {
+    "id": 1,
+    "username": "user",
+    "email": "user@example.com",
+    "plan": "free",
+    "newsletter_opt_in": false
+  }
+}
+```
+
+#### `POST /api/login`
+Вход в систему.
+
+**Request:**
+```json
+{
+  "email": "user@example.com",
+  "password": "secure_password"
+}
+```
+
+**Response:**
+```json
+{
+  "ok": true,
+  "token": "eyJhbGciOiJI...",
+  "user": { ... }
+}
+```
+
+#### `GET /api/me`
+Получение информации о текущем пользователе (требует токен).
+
+#### `POST /api/logout`
+Выход (инвалидация токена на стороне клиента).
+
+### Работа с изображениями
+
+#### `POST /api/upload`
+Загрузка изображения. Требует авторизацию.
 
 **Request:** `multipart/form-data`, поле `image`
 
@@ -128,8 +197,8 @@ StencilForge/
 }
 ```
 
-### `POST /api/layers`
-Генерация трафаретных слоёв.
+#### `POST /api/layers`
+Генерация трафаретных слоёв. Требует авторизацию.
 
 **Request:**
 ```json
@@ -154,8 +223,18 @@ StencilForge/
 }
 ```
 
-### `GET /api/download-all?session=...&layer=N`
-Скачивание слоя как PNG.
+#### `GET /api/download-all?session=...&layer=N`
+Скачивание отдельного слоя как PNG. Требует авторизацию.
+
+#### `POST /api/download-all`
+Скачивание всех слоёв в ZIP-архиве. Требует авторизацию.
+
+**Request:**
+```json
+{
+  "session_id": "photo.png_12345"
+}
+```
 
 ## Алгоритм выделения слоёв
 

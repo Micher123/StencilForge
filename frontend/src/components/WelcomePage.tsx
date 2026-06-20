@@ -132,7 +132,7 @@ const WelcomePage: React.FC = () => {
           <div className="demo-line">
             <div className="demo-item">
               <img src="/examples/layer0.svg" alt="Исходное изображение" className="demo-img" />
-              <span className="demo-label">Слой 0</span>
+              <span className="demo-label">Исходник</span>
             </div>
             <span className="demo-arrow">→</span>
             <div className="demo-item">
@@ -170,8 +170,8 @@ const WelcomePage: React.FC = () => {
             </div>
             <span className="demo-arrow">→</span>
             <div className="demo-item">
-              <img src="/examples/layer0.svg" alt="Слой 0" className="demo-img" />
-              <span className="demo-label">Слой 0</span>
+              <img src="/examples/layer0.svg" alt="Исходник" className="demo-img" />
+              <span className="demo-label">Исходник</span>
             </div>
           </div>
 

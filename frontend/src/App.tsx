@@ -1,104 +1,170 @@
-import { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { extractErrorMessage } from './utils/errors';
+import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom';
+import ThemeToggle from './components/ThemeToggle';
 import UploadZone from './components/UploadZone';
 import LayersPanel from './components/LayersPanel';
-import ThemeToggle from './components/ThemeToggle';
 import AuthPage from './components/AuthPage';
-
-interface LayerInfo {
-  index: number;
-  download_url: string;
-  data_url: string;
-}
+import ProfilePage from './components/ProfilePage';
+import WelcomePage from './components/WelcomePage';
+import './styles/global.css';
 
 interface UserInfo {
   id: number;
   username: string;
   email: string;
   plan: string;
-  newsletter_opt_in: boolean;
+  max_layers?: number;
+  newsletter_opt_in?: boolean;
 }
 
-type AppPhase = 'upload' | 'layers';
-
-function App() {
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    return (localStorage.getItem('stencilforge-theme') as 'light' | 'dark') || 'light';
-  });
-  const [token, setToken] = useState<string>(() => {
-    return localStorage.getItem('stencilforge-token') || '';
-  });
+// ---------- Shell ----------
+const AppShell: React.FC = () => {
+  const [token, setToken] = useState<string>(() => localStorage.getItem('stencilforge_token') || '');
   const [user, setUser] = useState<UserInfo | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [phase, setPhase] = useState<AppPhase>('upload');
-  const [sessionId, setSessionId] = useState<string>('');
-  const [previewUrl, setPreviewUrl] = useState<string>('');
-  const [numLayers, setNumLayers] = useState<number>(4);
-  const [layers, setLayers] = useState<LayerInfo[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [theme, setTheme] = useState<'light' | 'dark'>(() =>
+    (localStorage.getItem('stencilforge_theme') as 'light' | 'dark') || 'dark'
+  );
+  const [maxLayers, setMaxLayers] = useState(3);
+  const navigate = useNavigate();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('stencilforge-theme', theme);
+    localStorage.setItem('stencilforge_theme', theme);
   }, [theme]);
 
-  // Проверка токена при загрузке
-  useEffect(() => {
-    if (!token) {
-      setAuthChecked(true);
-      return;
-    }
-    fetch('/api/me', {
-      headers: { 'Authorization': `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.ok && data.user) {
-          setUser(data.user);
-        } else {
-          localStorage.removeItem('stencilforge-token');
-          setToken('');
-        }
-        setAuthChecked(true);
-      })
-      .catch(() => {
-        setAuthChecked(true);
+  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark');
+
+  const fetchUser = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/me', {
+        headers: { 'Authorization': `Bearer ${token}` },
       });
+      if (!res.ok) {
+        const msg = await extractErrorMessage(res);
+        throw new Error(msg);
+      }
+      const data = await res.json();
+      const u: UserInfo = data.user || data;
+      setUser(u);
+      setMaxLayers(u.max_layers || 3);
+    } catch {
+      localStorage.removeItem('stencilforge_token');
+      setToken('');
+      setUser(null);
+      setMaxLayers(3);
+    }
   }, [token]);
 
-  const handleAuth = useCallback((newToken: string, userInfo: UserInfo) => {
-    setToken(newToken);
-    setUser(userInfo);
-    localStorage.setItem('stencilforge-token', newToken);
-  }, []);
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
 
-  const handleLogout = useCallback(() => {
-    fetch('/api/logout', { method: 'POST' }).catch(() => { });
-    localStorage.removeItem('stencilforge-token');
+  const handleAuth = (t: string, _u: UserInfo) => {
+    localStorage.setItem('stencilforge_token', t);
+    setToken(t);
+    navigate('/');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('stencilforge_token');
     setToken('');
     setUser(null);
-    setPhase('upload');
-    setSessionId('');
-    setPreviewUrl('');
+    setMaxLayers(3);
+    navigate('/');
+  };
+
+  return (
+    <div className="app">
+      <header className="app-header">
+        <div className="header-left">
+          <Link to="/" className="logo">🖼 StencilForge</Link>
+        </div>
+        <div className="header-right">
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          {token && user && (
+            <>
+              <Link to="/profile" className="nav-link">
+                {user.username}{' '}
+                <span className={`plan-badge plan-${user.plan}`}>{user.plan}</span>
+              </Link>
+              <button className="btn btn-sm btn-outline" onClick={handleLogout}>
+                Выйти
+              </button>
+            </>
+          )}
+          {!token && (
+            <Link to="/auth" className="btn btn-sm">
+              Войти
+            </Link>
+          )}
+        </div>
+      </header>
+
+      <main className="app-main">
+        <Routes>
+          <Route
+            path="/"
+            element={
+              token && user ? (
+                <MainPage token={token} user={user} maxLayers={maxLayers} />
+              ) : (
+                <WelcomePage />
+              )
+            }
+          />
+          <Route path="/auth" element={<AuthPage onAuth={handleAuth} />} />
+          <Route path="/profile" element={<ProfilePage token={token} />} />
+        </Routes>
+      </main>
+
+      <footer className="app-footer">
+        <span>StencilForge © 2026</span>
+      </footer>
+    </div>
+  );
+};
+
+// ---------- Main page ----------
+const MainPage: React.FC<{
+  token: string;
+  user: UserInfo | null;
+  maxLayers: number;
+}> = ({ token, user, maxLayers }) => {
+  const [sessionID, setSessionID] = useState('');
+  const [numLayers, setNumLayers] = useState(Math.min(3, maxLayers));
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState('');
+  const [layers, setLayers] = useState<
+    { index: number; download_url: string; data_url: string }[]
+  >([]);
+
+  useEffect(() => {
+    if (numLayers > maxLayers) setNumLayers(maxLayers);
+  }, [maxLayers, numLayers]);
+
+  const handleUploaded = useCallback((sid: string, _dataUrl: string) => {
+    setSessionID(sid);
     setLayers([]);
     setError('');
   }, []);
 
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+  const handleUploadError = useCallback((msg: string) => {
+    setError(msg);
   }, []);
 
-  const handleUploaded = useCallback((sid: string, dataUrl: string) => {
-    setSessionId(sid);
-    setPreviewUrl(dataUrl);
-    setPhase('layers');
-    setLayers([]);
-    setError('');
-  }, []);
+  const handleGenerate = async () => {
+    if (!sessionID) {
+      setError('Сначала загрузите изображение');
+      return;
+    }
+    if (!token) {
+      setError('Войдите в аккаунт для обработки');
+      return;
+    }
 
-  const handleGenerate = useCallback(async () => {
-    if (!sessionId) return;
-    setLoading(true);
+    setProcessing(true);
     setError('');
     setLayers([]);
 
@@ -110,179 +176,83 @@ function App() {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          session_id: sessionId,
+          session_id: sessionID,
           num_layers: numLayers,
           auto_layers: false,
         }),
       });
-
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Ошибка сервера: ${res.status}`);
+        const msg = await extractErrorMessage(res);
+        throw new Error(msg);
       }
-
       const data = await res.json();
-      if (data.layers && Array.isArray(data.layers)) {
-        setLayers(data.layers);
-      } else {
-        throw new Error('Некорректный ответ от сервера');
-      }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Неизвестная ошибка';
-      setError(msg);
+      setLayers(data.layers || []);
+    } catch (e: any) {
+      setError(e.message || 'Ошибка генерации слоёв');
     } finally {
-      setLoading(false);
+      setProcessing(false);
     }
-  }, [sessionId, numLayers, token]);
-
-  const handleDownloadAll = useCallback(async () => {
-    if (!sessionId) return;
-    try {
-      const res = await fetch('/api/download-all', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ session_id: sessionId }),
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Ошибка скачивания: ${res.status}`);
-      }
-      // Скачиваем zip-файл
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'stencilforge-layers.zip';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Неизвестная ошибка при скачивании';
-      setError(msg);
-    }
-  }, [sessionId, token]);
-
-  const handleReset = useCallback(() => {
-    setPhase('upload');
-    setSessionId('');
-    setPreviewUrl('');
-    setLayers([]);
-    setError('');
-  }, []);
-
-  if (!authChecked) {
-    return (
-      <div className="app-container">
-        <header className="app-header">
-          <h1>StencilForge</h1>
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
-        </header>
-        <main className="main-content">
-          <div className="card">
-            <p>Загрузка...</p>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  // Не авторизован — показываем страницу входа/регистрации
-  if (!token || !user) {
-    return (
-      <div className="app-container">
-        <header className="app-header">
-          <h1>StencilForge</h1>
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
-        </header>
-        <main className="main-content">
-          <AuthPage onAuth={handleAuth} />
-        </main>
-      </div>
-    );
-  }
+  };
 
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <h1>StencilForge</h1>
-        <div className="header-right">
-          <div className="user-info">
-            <span className="user-name">{user.username}</span>
-            <span className="user-plan">{user.plan}</span>
-          </div>
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
-          <button className="btn btn-logout" onClick={handleLogout} title="Выйти">
-            Выйти
+    <div className="main">
+      <UploadZone onUploaded={handleUploaded} onError={handleUploadError} token={token} />
+
+      {token && (
+        <div className="layers-control">
+          <label>
+            Количество слоёв:{' '}
+            <input
+              type="number"
+              min={1}
+              max={maxLayers}
+              value={numLayers}
+              onChange={e =>
+                setNumLayers(
+                  Math.min(maxLayers, Math.max(1, Number(e.target.value) || 1)),
+                )
+              }
+              className="num-input"
+              disabled={!sessionID}
+            />
+          </label>
+          <span className="limit-hint">
+            (макс. {maxLayers} для вашего тарифа)
+          </span>
+          <button
+            className="btn btn-primary"
+            onClick={handleGenerate}
+            disabled={!sessionID || processing}
+            title={!sessionID ? 'Сначала загрузите изображение' : ''}
+          >
+            {processing ? 'Обработка...' : 'Создать трафареты'}
           </button>
         </div>
-      </header>
+      )}
 
-      <main className="main-content">
-        {error && (
-          <div className="error-msg">{error}</div>
-        )}
+      {error && <div className="msg msg-error">{error}</div>}
 
-        {phase === 'upload' && (
-          <div className="card">
-            <h2 className="card-title">Загрузка изображения</h2>
-            <UploadZone onUploaded={handleUploaded} onError={setError} token={token} />
-          </div>
-        )}
+      {processing && (
+        <div className="page-center">
+          <div className="spinner"></div>
+          <p>Кластеризация и построение слоёв...</p>
+        </div>
+      )}
 
-        {phase === 'layers' && (
-          <>
-            <div className="card">
-              <h2 className="card-title">Исходное изображение</h2>
-              {previewUrl && (
-                <img src={previewUrl} alt="Исходное" className="uploaded-image" />
-              )}
-            </div>
-
-            <div className="card">
-              <h2 className="card-title">Параметры трафаретов</h2>
-              <div className="controls">
-                <div className="control-group">
-                  <label htmlFor="numLayers">Количество слоёв (2–16)</label>
-                  <input
-                    id="numLayers"
-                    type="number"
-                    min={2}
-                    max={16}
-                    value={numLayers}
-                    onChange={(e) => setNumLayers(Math.max(2, Math.min(16, parseInt(e.target.value) || 4)))}
-                  />
-                </div>
-                <button
-                  className="btn btn-primary"
-                  onClick={handleGenerate}
-                  disabled={loading}
-                >
-                  {loading ? 'Обработка...' : 'Создать слои'}
-                </button>
-                <button className="btn btn-secondary" onClick={handleReset}>
-                  Загрузить другое изображение
-                </button>
-              </div>
-            </div>
-
-            <LayersPanel layers={layers} loading={loading} />
-            {layers.length > 0 && (
-              <div className="card">
-                <h2 className="card-title">Скачать всё</h2>
-                <button className="btn btn-primary" onClick={handleDownloadAll}>
-                  Скачать все слои (ZIP)
-                </button>
-              </div>
-            )}
-          </>
-        )}
-      </main>
+      {layers.length > 0 && (
+        <LayersPanel layers={layers} loading={false} />
+      )}
     </div>
   );
-}
+};
+
+// ---------- Root ----------
+const App: React.FC = () => {
+  return (
+    <BrowserRouter>
+      <AppShell />
+    </BrowserRouter>
+  );
+};
 
 export default App;

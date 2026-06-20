@@ -56,7 +56,7 @@ function LayersPanel({ layers, loading }: Props) {
 
   return (
     <div className="card">
-      <h2 className="card-title">Слои трафарета ({layers.length})</h2>
+      <h2 className="card-title">Слои трафарета</h2>
       <div className="layers-grid">
         {layers.map((layer) => (
           <div key={layer.index} className="layer-card">
@@ -72,7 +72,7 @@ function LayersPanel({ layers, loading }: Props) {
               className="download-btn"
               onClick={() => handleDownloadLayer(layer)}
             >
-              ⬇ Скачать
+              Скачать
             </button>
           </div>
         ))}
@@ -82,12 +82,6 @@ function LayersPanel({ layers, loading }: Props) {
       {zoomedLayer && (
         <div className="zoom-overlay" onClick={handleCloseZoom}>
           <div className="zoom-container" onClick={(e) => e.stopPropagation()}>
-            <button className="zoom-close" onClick={handleCloseZoom} title="Закрыть">
-              ✕
-            </button>
-            <div className="zoom-header">
-              Слой {zoomedLayer.index + 1}
-            </div>
             <img
               src={zoomedLayer.data_url}
               alt={`Слой ${zoomedLayer.index + 1}`}
@@ -98,7 +92,7 @@ function LayersPanel({ layers, loading }: Props) {
                 className="btn btn-primary"
                 onClick={() => handleDownloadLayer(zoomedLayer)}
               >
-                ⬇ Скачать слой
+                Скачать слой
               </button>
             </div>
           </div>

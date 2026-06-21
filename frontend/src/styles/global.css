@@ -117,6 +117,17 @@ a:hover {
   color: var(--text-secondary);
   font-size: 13px;
   flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.app-footer .footer-inn {
+  color: var(--text-secondary);
+  opacity: 0.7;
+  font-size: 12px;
 }
 
 /* ---------- buttons ---------- */

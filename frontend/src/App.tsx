@@ -125,6 +125,7 @@ const AppShell: React.FC = () => {
 
       <footer className="app-footer">
         <span>StencilForge © 2026</span>
+        <span className="footer-inn">ИНН 235214614964</span>
       </footer>
     </div>
   );

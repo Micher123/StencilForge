@@ -1411,4 +1411,89 @@ a:hover {
   .plans-grid {
     grid-template-columns: 1fr;
   }
+
+  .terms-card {
+    max-width: 100%;
+    padding: 20px;
+  }
+}
+
+/* ============================================================
+   Terms Page (Пользовательское соглашение)
+   ============================================================ */
+.terms-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.terms-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 40px 48px;
+  box-shadow: var(--shadow);
+  line-height: 1.8;
+  color: var(--text-primary);
+}
+
+.terms-card h1 {
+  font-size: 26px;
+  margin-bottom: 12px;
+  color: var(--accent);
+}
+
+.terms-card h2 {
+  font-size: 18px;
+  margin-top: 32px;
+  margin-bottom: 10px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 6px;
+}
+
+.terms-card hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 20px 0;
+}
+
+.terms-card p {
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+}
+
+.terms-card strong {
+  color: var(--text-primary);
+}
+
+.terms-card em {
+  color: var(--text-primary);
+  font-style: italic;
+}
+
+.terms-card ul {
+  margin: 8px 0 16px 24px;
+  color: var(--text-secondary);
+}
+
+.terms-card ul li {
+  margin-bottom: 6px;
+}
+
+.terms-card a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.terms-meta {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.terms-footer {
+  font-size: 13px;
+  text-align: center;
+  color: var(--text-secondary);
+  opacity: 0.7;
 }

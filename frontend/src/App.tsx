@@ -7,6 +7,8 @@ import LayersPanel from './components/LayersPanel';
 import AuthPage from './components/AuthPage';
 import ProfilePage from './components/ProfilePage';
 import WelcomePage from './components/WelcomePage';
+import TermsPage from './components/TermsPage';
+import PrivacyPage from './components/PrivacyPage';
 import './styles/global.css';
 
 interface UserInfo {
@@ -116,6 +118,8 @@ const AppShell: React.FC = () => {
           />
           <Route path="/auth" element={<AuthPage onAuth={handleAuth} />} />
           <Route path="/profile" element={<ProfilePage token={token} />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
         </Routes>
       </main>
 

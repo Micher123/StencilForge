@@ -1,4 +1,5 @@
 import { useState, useCallback, FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { extractErrorMessage } from '../utils/errors';
 
 interface UserInfo {
@@ -255,13 +256,13 @@ function AuthPage({ onAuth, token: existingToken }: AuthPageProps) {
                   />
                   <span>
                     Я принимаю{' '}
-                    <a href="#" className="term-link" onClick={(e) => { e.preventDefault(); alert('Пользовательское соглашение (заглушка)'); }}>
+                    <Link to="/terms" className="term-link" target="_blank" rel="noopener noreferrer">
                       Пользовательское соглашение
-                    </a>{' '}
+                    </Link>{' '}
                     и{' '}
-                    <a href="#" className="term-link" onClick={(e) => { e.preventDefault(); alert('Политика конфиденциальности (заглушка)'); }}>
+                    <Link to="/privacy" className="term-link" target="_blank" rel="noopener noreferrer">
                       Политику конфиденциальности
-                    </a>
+                    </Link>
                   </span>
                 </label>
               </div>

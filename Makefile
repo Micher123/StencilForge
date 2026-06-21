@@ -80,6 +80,73 @@ dev:
 # Быстрый запуск (сборка и запуск одной командой)
 run: build deploy
 
+# === Кластер ===
+
+# Запуск worker-ноды (только бэкенд)
+# Использование: make cluster-worker PORT=8081 NODE_ID=worker-01 MAIN_URL=http://127.0.0.1:8080
+cluster-worker:
+	@echo "=== Запуск Worker-ноды ==="
+	cd backend && env \
+		PORT=$${PORT:-8081} \
+		STENCILFORGE_CLUSTER_MODE=worker \
+		STENCILFORGE_NODE_ID=$${NODE_ID:-worker-01} \
+		STENCILFORGE_ADVERTISE_URL=http://127.0.0.1:$${PORT:-8081} \
+		STENCILFORGE_MAIN_URL=$${MAIN_URL:-http://127.0.0.1:8080} \
+		STENCILFORGE_CLUSTER_SECRET=$${CLUSTER_SECRET:-dev-secret} \
+		CGO_ENABLED=1 \
+		go run .
+
+# Запуск главной ноды с кластером (dev)
+cluster-main:
+	@echo "=== Запуск Главной ноды с кластером ==="
+	cd backend && env \
+		PORT=$${PORT:-8080} \
+		STENCILFORGE_CLUSTER_MODE=main \
+		STENCILFORGE_NODE_ID=$${NODE_ID:-main-01} \
+		STENCILFORGE_ADVERTISE_URL=http://127.0.0.1:$${PORT:-8080} \
+		STENCILFORGE_MAX_WORKERS=$${MAX_WORKERS:-4} \
+		STENCILFORGE_CLUSTER_SECRET=$${CLUSTER_SECRET:-dev-secret} \
+		CGO_ENABLED=1 \
+		go run .
+
+# Запуск кластера локально (main + 2 worker'а)
+# Требуется: открытые порты 8080, 8081, 8082
+cluster-dev:
+	@echo "=== Запуск локального кластера ==="
+	@echo "Главная нода: http://localhost:8080"
+	@echo "Worker-1:     http://localhost:8081"
+	@echo "Worker-2:     http://localhost:8082"
+	@trap 'kill 0' EXIT; \
+	(cd backend && env \
+		PORT=8080 \
+		STENCILFORGE_CLUSTER_MODE=main \
+		STENCILFORGE_NODE_ID=main-01 \
+		STENCILFORGE_ADVERTISE_URL=http://127.0.0.1:8080 \
+		STENCILFORGE_MAX_WORKERS=4 \
+		STENCILFORGE_CLUSTER_SECRET=dev-secret \
+		CGO_ENABLED=1 \
+		go run .) & \
+	sleep 2; \
+	(cd backend && env \
+		PORT=8081 \
+		STENCILFORGE_CLUSTER_MODE=worker \
+		STENCILFORGE_NODE_ID=worker-01 \
+		STENCILFORGE_ADVERTISE_URL=http://127.0.0.1:8081 \
+		STENCILFORGE_MAIN_URL=http://127.0.0.1:8080 \
+		STENCILFORGE_CLUSTER_SECRET=dev-secret \
+		CGO_ENABLED=1 \
+		go run .) & \
+	(cd backend && env \
+		PORT=8082 \
+		STENCILFORGE_CLUSTER_MODE=worker \
+		STENCILFORGE_NODE_ID=worker-02 \
+		STENCILFORGE_ADVERTISE_URL=http://127.0.0.1:8082 \
+		STENCILFORGE_MAIN_URL=http://127.0.0.1:8080 \
+		STENCILFORGE_CLUSTER_SECRET=dev-secret \
+		CGO_ENABLED=1 \
+		go run .) & \
+	wait
+
 # === Администрирование ===
 
 # Апгрейд пользователя до тарифа Ultima (32 слоя)

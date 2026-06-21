@@ -12,9 +12,20 @@
 #   ./deploy.sh clean      Очистка артефактов сборки
 #   ./deploy.sh install    Установка зависимостей
 #   ./deploy.sh dev        Запуск в dev-режиме (frontend + backend)
+#   ./deploy.sh cluster-main      Запуск главной ноды кластера
+#   ./deploy.sh cluster-worker    Запуск worker-ноды кластера
+#   ./deploy.sh cluster-dev       Запуск локального кластера (main + 2 worker'а)
 #
 # Переменные окружения:
 #   PORT — порт сервера (по умолчанию 8080)
+#
+# Кластерные переменные:
+#   STENCILFORGE_CLUSTER_MODE   — main или worker
+#   STENCILFORGE_NODE_ID        — уникальный ID ноды
+#   STENCILFORGE_ADVERTISE_URL  — URL этой ноды
+#   STENCILFORGE_MAIN_URL       — URL главной ноды (только для worker)
+#   STENCILFORGE_MAX_WORKERS    — макс. количество worker'ов (для main)
+#   STENCILFORGE_CLUSTER_SECRET — секретный ключ межнодового обмена
 
 set -euo pipefail
 
@@ -233,23 +244,156 @@ cmd_dev() {
 }
 
 # --------------------------------------------------
+# Кластер — Главная нода
+# --------------------------------------------------
+cmd_cluster_main() {
+    check_tools
+    local main_port="${PORT:-8080}"
+    local node_id="${STENCILFORGE_NODE_ID:-main-01}"
+    local advertise_url="${STENCILFORGE_ADVERTISE_URL:-http://127.0.0.1:$main_port}"
+    local max_workers="${STENCILFORGE_MAX_WORKERS:-4}"
+    local cluster_secret="${STENCILFORGE_CLUSTER_SECRET:-dev-secret}"
+
+    log_step "Запуск Главной ноды кластера..."
+    log_info "  Port:           $main_port"
+    log_info "  Node ID:        $node_id"
+    log_info "  Advertise URL:  $advertise_url"
+    log_info "  Max Workers:    $max_workers"
+    log_info "  Cluster Secret: ***"
+
+    cd "$SCRIPT_DIR/backend"
+    env \
+        PORT="$main_port" \
+        STENCILFORGE_CLUSTER_MODE="main" \
+        STENCILFORGE_NODE_ID="$node_id" \
+        STENCILFORGE_ADVERTISE_URL="$advertise_url" \
+        STENCILFORGE_MAX_WORKERS="$max_workers" \
+        STENCILFORGE_CLUSTER_SECRET="$cluster_secret" \
+        CGO_ENABLED=1 \
+        go run .
+}
+
+# --------------------------------------------------
+# Кластер — Worker-нода
+# --------------------------------------------------
+cmd_cluster_worker() {
+    check_tools
+    local worker_port="${PORT:-8081}"
+    local node_id="${STENCILFORGE_NODE_ID:-worker-01}"
+    local advertise_url="${STENCILFORGE_ADVERTISE_URL:-http://127.0.0.1:$worker_port}"
+    local main_url="${STENCILFORGE_MAIN_URL:-http://127.0.0.1:8080}"
+    local cluster_secret="${STENCILFORGE_CLUSTER_SECRET:-dev-secret}"
+
+    log_step "Запуск Worker-ноды кластера..."
+    log_info "  Port:           $worker_port"
+    log_info "  Node ID:        $node_id"
+    log_info "  Advertise URL:  $advertise_url"
+    log_info "  Main URL:       $main_url"
+    log_info "  Cluster Secret: ***"
+
+    cd "$SCRIPT_DIR/backend"
+    env \
+        PORT="$worker_port" \
+        STENCILFORGE_CLUSTER_MODE="worker" \
+        STENCILFORGE_NODE_ID="$node_id" \
+        STENCILFORGE_ADVERTISE_URL="$advertise_url" \
+        STENCILFORGE_MAIN_URL="$main_url" \
+        STENCILFORGE_CLUSTER_SECRET="$cluster_secret" \
+        CGO_ENABLED=1 \
+        go run .
+}
+
+# --------------------------------------------------
+# Кластер — Локальный запуск (main + 2 worker'а)
+# --------------------------------------------------
+cmd_cluster_dev() {
+    check_tools
+    local main_port="${PORT:-8080}"
+    local cluster_secret="${STENCILFORGE_CLUSTER_SECRET:-dev-secret}"
+    local max_workers="${STENCILFORGE_MAX_WORKERS:-4}"
+
+    log_info "=== Запуск локального кластера ==="
+    log_info "Главная нода: http://localhost:$main_port"
+    log_info "Worker-1:     http://localhost:8081"
+    log_info "Worker-2:     http://localhost:8082"
+    log_info ""
+
+    trap 'kill 0' EXIT
+    (
+        cd "$SCRIPT_DIR/backend"
+        env \
+            PORT="$main_port" \
+            STENCILFORGE_CLUSTER_MODE="main" \
+            STENCILFORGE_NODE_ID="main-01" \
+            STENCILFORGE_ADVERTISE_URL="http://127.0.0.1:$main_port" \
+            STENCILFORGE_MAX_WORKERS="$max_workers" \
+            STENCILFORGE_CLUSTER_SECRET="$cluster_secret" \
+            CGO_ENABLED=1 \
+            go run .
+    ) &
+    sleep 2
+    (
+        cd "$SCRIPT_DIR/backend"
+        env \
+            PORT="8081" \
+            STENCILFORGE_CLUSTER_MODE="worker" \
+            STENCILFORGE_NODE_ID="worker-01" \
+            STENCILFORGE_ADVERTISE_URL="http://127.0.0.1:8081" \
+            STENCILFORGE_MAIN_URL="http://127.0.0.1:$main_port" \
+            STENCILFORGE_CLUSTER_SECRET="$cluster_secret" \
+            CGO_ENABLED=1 \
+            go run .
+    ) &
+    (
+        cd "$SCRIPT_DIR/backend"
+        env \
+            PORT="8082" \
+            STENCILFORGE_CLUSTER_MODE="worker" \
+            STENCILFORGE_NODE_ID="worker-02" \
+            STENCILFORGE_ADVERTISE_URL="http://127.0.0.1:8082" \
+            STENCILFORGE_MAIN_URL="http://127.0.0.1:$main_port" \
+            STENCILFORGE_CLUSTER_SECRET="$cluster_secret" \
+            CGO_ENABLED=1 \
+            go run .
+    ) &
+    wait
+}
+
+# --------------------------------------------------
 # Точка входа
 # --------------------------------------------------
 usage() {
-    echo "Использование: $0 {build|start|stop|restart|logs|status|clean|install|dev}"
+    echo "Использование: $0 {build|start|stop|restart|logs|status|clean|install|dev|cluster-main|cluster-worker|cluster-dev}"
     echo ""
-    echo "  build      Сборка проекта (фронтенд + бэкенд)"
-    echo "  start      Запуск сервера в фоне"
-    echo "  stop       Остановка сервера"
-    echo "  restart    Перезапуск сервера"
-    echo "  logs       Просмотр логов (tail -f)"
-    echo "  status     Статус сервера"
-    echo "  clean      Очистка артефактов сборки"
-    echo "  install    Установка зависимостей"
-    echo "  dev        Запуск в dev-режиме (frontend + backend)"
+    echo "  build            Сборка проекта (фронтенд + бэкенд)"
+    echo "  start            Запуск сервера в фоне"
+    echo "  stop             Остановка сервера"
+    echo "  restart          Перезапуск сервера"
+    echo "  logs             Просмотр логов (tail -f)"
+    echo "  status           Статус сервера"
+    echo "  clean            Очистка артефактов сборки"
+    echo "  install          Установка зависимостей"
+    echo "  dev              Запуск в dev-режиме (frontend + backend)"
+    echo ""
+    echo "  cluster-main     Запуск главной ноды кластера"
+    echo "  cluster-worker   Запуск worker-ноды кластера"
+    echo "  cluster-dev      Запуск локального кластера (main + 2 worker'а)"
     echo ""
     echo "Переменные окружения:"
-    echo "  PORT       Порт сервера (по умолчанию 8080)"
+    echo "  PORT                        Порт сервера (по умолчанию 8080)"
+    echo ""
+    echo "Кластерные переменные:"
+    echo "  STENCILFORGE_CLUSTER_MODE   main или worker"
+    echo "  STENCILFORGE_NODE_ID        Уникальный ID ноды"
+    echo "  STENCILFORGE_ADVERTISE_URL  URL этой ноды"
+    echo "  STENCILFORGE_MAIN_URL       URL главной ноды (только для worker)"
+    echo "  STENCILFORGE_MAX_WORKERS    Макс. количество worker'ов (для main)"
+    echo "  STENCILFORGE_CLUSTER_SECRET Секретный ключ межнодового обмена"
+    echo ""
+    echo "Примеры кластера:"
+    echo "  $0 cluster-main"
+    echo "  STENCILFORGE_NODE_ID=worker-01 STENCILFORGE_MAIN_URL=http://10.0.0.1:8080 PORT=8081 $0 cluster-worker"
+    echo "  STENCILFORGE_CLUSTER_SECRET=mysecret STENCILFORGE_MAX_WORKERS=8 $0 cluster-dev"
     exit 0
 }
 
@@ -258,15 +402,18 @@ if [[ $# -eq 0 ]]; then
 fi
 
 case "$1" in
-    build)    cmd_build ;;
-    start)    cmd_start ;;
-    stop)     cmd_stop ;;
-    restart)  cmd_restart ;;
-    logs)     cmd_logs ;;
-    status)   cmd_status ;;
-    clean)    cmd_clean ;;
-    install)  cmd_install ;;
-    dev)      cmd_dev ;;
+    build)          cmd_build ;;
+    start)          cmd_start ;;
+    stop)           cmd_stop ;;
+    restart)        cmd_restart ;;
+    logs)           cmd_logs ;;
+    status)         cmd_status ;;
+    clean)          cmd_clean ;;
+    install)        cmd_install ;;
+    dev)            cmd_dev ;;
+    cluster-main)   cmd_cluster_main ;;
+    cluster-worker) cmd_cluster_worker ;;
+    cluster-dev)    cmd_cluster_dev ;;
     -h|--help|help) usage ;;
     *)
         log_error "Неизвестная команда: $1"

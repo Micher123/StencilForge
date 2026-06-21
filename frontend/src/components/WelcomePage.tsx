@@ -193,7 +193,7 @@ const WelcomePage: React.FC = () => {
                 <div key={plan.id} className="plan-card welcome-plan-card">
                   <div className="plan-name">{plan.name}</div>
                   <div className="plan-price">
-                    {isFree ? 'Бесплатно' : `от ${minPrice} ₽`}
+                    {isFree ? 'Бесплатно' : `до ${minPrice} ₽`}
                   </div>
                   <div className="plan-price-sub">в месяц</div>
                   <ul className="plan-features">

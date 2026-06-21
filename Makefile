@@ -1,4 +1,4 @@
-.PHONY: all build build-frontend build-backend deploy dev clean run
+.PHONY: all build build-frontend build-backend deploy dev clean run upgrade-to-ultima
 
 # === Основные цели ===
 
@@ -79,3 +79,25 @@ dev:
 
 # Быстрый запуск (сборка и запуск одной командой)
 run: build deploy
+
+# === Администрирование ===
+
+# Апгрейд пользователя до тарифа Ultima (16 слоёв)
+# Использование: make upgrade-to-ultima EMAIL=user@example.com
+upgrade-to-ultima:
+	@if [ -z "$(EMAIL)" ]; then \
+		echo "Ошибка: укажите EMAIL пользователя"; \
+		echo "Пример: make upgrade-to-ultima EMAIL=user@example.com"; \
+		exit 1; \
+	fi
+	@DB_DIR=$${STENCILFORGE_DATA_DIR:-$$HOME/.stencilforge}; \
+	DB_FILE="$$DB_DIR/stencilforge.db"; \
+	if [ ! -f "$$DB_FILE" ]; then \
+		echo "Ошибка: база данных не найдена: $$DB_FILE"; \
+		echo "Запустите сервер хотя бы раз (make deploy) для создания БД."; \
+		exit 1; \
+	fi; \
+	echo "Апгрейд пользователя $(EMAIL) до тарифа Ultima (16 слоёв)..."; \
+	sqlite3 "$$DB_FILE" "UPDATE users SET plan = 'ultima', max_layers = 16 WHERE email = '$(EMAIL)';"; \
+	echo "Готово. Проверка:"; \
+	sqlite3 -header -column "$$DB_FILE" "SELECT id, username, email, plan, max_layers FROM users WHERE email = '$(EMAIL)';"

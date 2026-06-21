@@ -82,7 +82,7 @@ func Close() {
 func PlanLimits(plan string) int {
 	switch plan {
 	case "ultima":
-		return 16
+		return 32
 	case "pro":
 		return 10
 	default:

@@ -82,7 +82,7 @@ run: build deploy
 
 # === Администрирование ===
 
-# Апгрейд пользователя до тарифа Ultima (16 слоёв)
+# Апгрейд пользователя до тарифа Ultima (32 слоя)
 # Использование: make upgrade-to-ultima EMAIL=user@example.com
 upgrade-to-ultima:
 	@if [ -z "$(EMAIL)" ]; then \
@@ -97,7 +97,7 @@ upgrade-to-ultima:
 		echo "Запустите сервер хотя бы раз (make deploy) для создания БД."; \
 		exit 1; \
 	fi; \
-	echo "Апгрейд пользователя $(EMAIL) до тарифа Ultima (16 слоёв)..."; \
-	sqlite3 "$$DB_FILE" "UPDATE users SET plan = 'ultima', max_layers = 16 WHERE email = '$(EMAIL)';"; \
+	echo "Апгрейд пользователя $(EMAIL) до тарифа Ultima (32 слоя)..."; \
+	sqlite3 "$$DB_FILE" "UPDATE users SET plan = 'ultima', max_layers = 32 WHERE email = '$(EMAIL)';"; \
 	echo "Готово. Проверка:"; \
 	sqlite3 -header -column "$$DB_FILE" "SELECT id, username, email, plan, max_layers FROM users WHERE email = '$(EMAIL)';"

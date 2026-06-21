@@ -22,7 +22,7 @@ const defaultPlans: PlanInfo[] = [
     ],
   },
   {
-    id: 'ultima', name: 'Ultima', max_layers: 16,
+    id: 'ultima', name: 'Ultima', max_layers: 32,
     durations: [
       { id: '1m', name: '1 месяц', price_rub: 499 },
       { id: '3m', name: '3 месяца', price_rub: 1099 },

@@ -150,8 +150,8 @@ func LayersHandler(w http.ResponseWriter, r *http.Request) {
 	if nLayers < 2 {
 		nLayers = 2
 	}
-	if nLayers > 16 {
-		nLayers = 16
+	if nLayers > 32 {
+		nLayers = 32
 	}
 
 	pixels := make([]processor.LabPixel, 0, wImg*hImg)

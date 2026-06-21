@@ -53,7 +53,7 @@ var plans = []PlanInfo{
 		},
 	},
 	{
-		ID: "ultima", Name: "Ultima", MaxLayers: 16,
+		ID: "ultima", Name: "Ultima", MaxLayers: 32,
 		Durations: []PlanDuration{
 			{ID: "1m", Name: "1 месяц", PriceRub: 499},
 			{ID: "3m", Name: "3 месяца", PriceRub: 1099},
